@@ -33,32 +33,37 @@ async function getAccessToken() {
 
 /**
  * GET /api/skills
- * Proxies to Lightcast's List All Skills endpoint.
- * Supported query params: q, limit, fields (no offset).
+ * (unchanged from before)
  */
-router.get('/api/skills', async (req, res, next) => {
+
+/* … existing GET /api/skills proxy … */
+
+/**
+ * POST /api/extract
+ * Body: { text: string, confidenceThreshold?: number }
+ * Proxies to Lightcast’s POST /skills/versions/latest/extract
+ */
+router.post('/api/extract', async (req, res, next) => {
   try {
     const token = await getAccessToken();
+    const { text, confidenceThreshold = 0.5 } = req.body;
 
-    // Sanitize and default query params
-    const q      = req.query.q      || '';          // search term
-    const limit  = Math.min(1000, parseInt(req.query.limit)  || 50);
-    const fields = (req.query.fields || 'id,name')
-                     .split(',')
-                     .map(f => f.trim())
-                     .filter(f => ['id','name','type','infoUrl','description'].includes(f))
-                     .join(',');
+    if (!text || typeof text !== 'string') {
+      return res.status(400).json({ error: 'Request body must include a "text" string.' });
+    }
 
-    // Call the Skills API
-    const response = await axios.get(
-      'https://emsiservices.com/skills/versions/latest/skills',
+    const response = await axios.post(
+      'https://emsiservices.com/skills/versions/latest/extract',
+      { text, confidenceThreshold },
       {
-        headers: { Authorization: `Bearer ${token}` },
-        params:  { q, limit, fields }
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       }
     );
 
-    // Return only the array of skills
+    // response.data.data is an array of { confidence, skill }
     res.json(response.data.data);
   } catch (err) {
     next(err);

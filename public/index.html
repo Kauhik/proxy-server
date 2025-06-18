@@ -2,55 +2,77 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Open Skills API Demo</title>
+  <title>Skills Extractor Demo</title>
   <style>
-    #spinner { display: none; font-style: italic; }
+    body { font-family: sans-serif; padding: 1rem; }
+    textarea { width: 100%; height: 150px; }
+    #spinner { display: none; margin-top: 0.5rem; font-style: italic; }
+    li { margin-bottom: 0.25rem; }
   </style>
 </head>
 <body>
-  <h1>Open Skills API Demo</h1>
+  <h1>Skills Extractor</h1>
 
-  <input id="searchInput" placeholder="Search skills…" />
-  <button id="searchBtn">Search</button>
-  <div id="spinner">Loading…</div>
-  <ul id="list"></ul>
+  <p>Paste your job experience or resume text below, then click <strong>Extract Skills</strong>:</p>
+  <textarea id="inputText" placeholder="E.g. Led a team of 5 engineers to build a React Native app with Firebase backend…"></textarea>
+  <br />
+  <button id="extractBtn">Extract Skills</button>
+  <div id="spinner">Extracting skills…</div>
+
+  <h2>Detected Skills</h2>
+  <ul id="results"></ul>
 
   <script>
-    const searchBtn = document.getElementById('searchBtn');
-    const spinner   = document.getElementById('spinner');
-    const list      = document.getElementById('list');
+    const btn     = document.getElementById('extractBtn');
+    const spinner = document.getElementById('spinner');
+    const input   = document.getElementById('inputText');
+    const results = document.getElementById('results');
 
-    async function searchSkills() {
-      const term = document.getElementById('searchInput').value.trim();
+    btn.addEventListener('click', async () => {
+      const text = input.value.trim();
+      if (!text) {
+        alert('Please paste some text first.');
+        return;
+      }
+
+      // UI state
       spinner.style.display = 'block';
-      searchBtn.disabled    = true;
-      list.innerHTML        = '';
+      btn.disabled           = true;
+      results.innerHTML      = '';
 
       try {
-        const params = new URLSearchParams({
-          q: term,
-          limit:  50,
-          fields: 'id,name,type,infoUrl'
+        const res = await fetch('/api/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, confidenceThreshold: 0.6 })
         });
-        const res = await fetch(`/api/skills?${params}`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const skills = await res.json();
-        
-        skills.forEach(skill => {
-          const li = document.createElement('li');
-          li.textContent = `${skill.id} — ${skill.name}`;
-          list.appendChild(li);
-        });
-      } catch (err) {
-        console.error(err);
-        alert('Failed to load skills—see console.');
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();  // array of { confidence, skill }
+        if (!data.length) {
+          results.innerHTML = '<li>No skills detected.</li>';
+        } else {
+          data.forEach(({ confidence, skill }) => {
+            const li = document.createElement('li');
+            li.innerHTML = 
+              `<strong>${skill.name}</strong>`
+              + ` <small>(confidence: ${(confidence*100).toFixed(0)}%)</small>`
+              + ` — <a href="${skill.infoUrl}" target="_blank">info</a>`;
+            results.appendChild(li);
+          });
+        }
+      } catch (e) {
+        console.error(e);
+        alert('Failed to extract skills: ' + e.message);
       } finally {
         spinner.style.display = 'none';
-        searchBtn.disabled    = false;
+        btn.disabled           = false;
       }
-    }
-
-    searchBtn.addEventListener('click', searchSkills);
+    });
   </script>
 </body>
 </html>
