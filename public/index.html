@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Open Skills API Demo</title>
+  <style>
+    #spinner { display: none; font-style: italic; }
+  </style>
+</head>
+<body>
+  <h1>Open Skills API Demo</h1>
+
+  <input id="searchInput" placeholder="Search skills…" />
+  <button id="searchBtn">Search</button>
+  <div id="spinner">Loading…</div>
+  <ul id="list"></ul>
+
+  <script>
+    const searchBtn = document.getElementById('searchBtn');
+    const spinner   = document.getElementById('spinner');
+    const list      = document.getElementById('list');
+
+    async function searchSkills() {
+      const term = document.getElementById('searchInput').value.trim();
+      spinner.style.display = 'block';
+      searchBtn.disabled    = true;
+      list.innerHTML        = '';
+
+      try {
+        const params = new URLSearchParams({
+          q: term,
+          limit:  50,
+          fields: 'id,name,type,infoUrl'
+        });
+        const res = await fetch(`/api/skills?${params}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const skills = await res.json();
+        
+        skills.forEach(skill => {
+          const li = document.createElement('li');
+          li.textContent = `${skill.id} — ${skill.name}`;
+          list.appendChild(li);
+        });
+      } catch (err) {
+        console.error(err);
+        alert('Failed to load skills—see console.');
+      } finally {
+        spinner.style.display = 'none';
+        searchBtn.disabled    = false;
+      }
+    }
+
+    searchBtn.addEventListener('click', searchSkills);
+  </script>
+</body>
+</html>
